@@ -1,0 +1,55 @@
+# Gradle
+.gradle/
+build/
+out/
+classes/
+
+# Eclipse
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.settings/
+.loadpath
+.recommenders
+.metadata
+.classpath
+.project
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# VS Code
+.vscode/
+
+# Mac
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Minecraft
+run/
+logs/
+crash-reports/
+saves/
+screenshots/
+
+# Mod specific
+config/yellspells.json
+models/
+*.log
