@@ -1,142 +1,83 @@
 package com.yellspells.client.stt;
 
-import com.yellspells.YellSpellsMod;
-import com.yellspells.client.hud.SpellHUD;
 import com.yellspells.network.YellSpellsNetworking;
+import com.yellspells.network.packets.CastIntentPacket;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.util.math.Vec3d;
 
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
-public class SpeechToTextManager {
-    private final BlockingQueue<float[]> audioQueue = new LinkedBlockingQueue<>();
-    private final AtomicBoolean running = new AtomicBoolean(false);
-    private final WhisperJNI whisper;
-    private final SpellDetector spellDetector;
-    private Thread processingThread;
-    
-    public SpeechToTextManager() {
-        this.whisper = new WhisperJNI();
-        this.spellDetector = new SpellDetector();
-    }
-    
-    public void start() {
-        if (running.compareAndSet(false, true)) {
-            try {
-                // Initialize whisper.cpp
-                whisper.initialize(YellSpellsMod.getConfig().modelName);
-                
-                processingThread = new Thread(this::processAudio, "YellSpells-STT");
-                processingThread.setDaemon(true);
-                processingThread.start();
-                
-                YellSpellsMod.LOGGER.info("Speech-to-text manager started");
-            } catch (Exception e) {
-                running.set(false);
-                YellSpellsMod.LOGGER.error("Failed to start STT manager", e);
-            }
+@Environment(EnvType.CLIENT)
+public final class SpeechToTextManager {
+
+  private final WhisperJNI whisper = new WhisperJNI();
+  private final ExecutorService exec = Executors.newSingleThreadExecutor(r -> new Thread(r, "YellSpells-STT"));
+
+  // Reused direct buffers
+  private final FloatBuffer audioBuf = ByteBuffer
+      .allocateDirect(4 * 5120) // 5120 float samples
+      .order(ByteOrder.nativeOrder())
+      .asFloatBuffer();
+
+  private final ByteBuffer textBuf = ByteBuffer.allocateDirect(2048).order(ByteOrder.nativeOrder());
+
+  private final AtomicInteger nonce = new AtomicInteger(1);
+
+  public SpeechToTextManager() {
+    // TODO: model manager; for now assume a model path is present and init off-thread
+    exec.submit(() -> {
+      try {
+        whisper.init(getDefaultModelPath(), 16000, Math.max(1, Runtime.getRuntime().availableProcessors() / 2));
+      } catch (Throwable ignored) {}
+    });
+  }
+
+  public void pushBlock(float[] block, int samples, boolean speaking) {
+    exec.submit(() -> {
+      if (!whisper.available()) return;
+      audioBuf.clear();
+      audioBuf.put(block, 0, samples);
+      audioBuf.flip();
+      whisper.push(audioBuf, samples);
+
+      // Poll once (or loop) for a partial
+      textBuf.clear();
+      float[] confStable = new float[2]; // [0]=confidence, [1]=isStable(0/1)
+      int wrote = whisper.poll(textBuf, confStable);
+      if (wrote > 0 && confStable[0] >= 0.65f) {
+        textBuf.limit(wrote);
+        byte[] utf8 = new byte[wrote];
+        textBuf.get(utf8);
+        String partial = new String(utf8);
+
+        String spell = SpellDetector.detectKeyword(partial); // your keyword matching
+        if (spell != null) {
+          long tick = MinecraftClient.getInstance().world == null ? 0 : MinecraftClient.getInstance().world.getTime();
+          long now = System.currentTimeMillis();
+
+          CastIntentPacket pkt = new CastIntentPacket(spell, confStable[0], tick, now, nonce.getAndIncrement(), new byte[32]);
+          byte[] key = YellSpellsNetworking.getClientSessionKey();
+          if (key != null) {
+            pkt.hmac = pkt.generateHmac(key);
+            sendIntent(pkt);
+          }
         }
-    }
-    
-    public void stop() {
-        if (running.compareAndSet(true, false)) {
-            if (processingThread != null) {
-                processingThread.interrupt();
-                try {
-                    processingThread.join(1000);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }
-            
-            try {
-                whisper.cleanup();
-            } catch (Exception e) {
-                YellSpellsMod.LOGGER.error("Failed to cleanup whisper", e);
-            }
-            
-            audioQueue.clear();
-            YellSpellsMod.LOGGER.info("Speech-to-text manager stopped");
-        }
-    }
-    
-    public void processAudioChunk(float[] audioData) {
-        if (!running.get()) return;
-        
-        try {
-            audioQueue.offer(audioData);
-        } catch (Exception e) {
-            YellSpellsMod.LOGGER.error("Failed to queue audio chunk", e);
-        }
-    }
-    
-    private void processAudio() {
-        while (running.get() && !Thread.currentThread().isInterrupted()) {
-            try {
-                float[] audioData = audioQueue.take();
-                
-                // Process with whisper.cpp
-                String transcript = whisper.transcribe(audioData);
-                float confidence = whisper.getConfidence();
-                
-                if (transcript != null && !transcript.trim().isEmpty()) {
-                    // Update HUD
-                    SpellHUD hud = com.yellspells.client.YellSpellsClientMod.getSpellHUD();
-                    if (hud != null) {
-                        hud.updateTranscript(transcript, confidence);
-                    }
-                    
-                    // Check for spell detection
-                    SpellDetectionResult result = spellDetector.detectSpell(transcript, confidence);
-                    if (result != null && result.isStable()) {
-                        // Cast spell
-                        castSpell(result);
-                    }
-                }
-                
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            } catch (Exception e) {
-                YellSpellsMod.LOGGER.error("Error processing audio", e);
-            }
-        }
-    }
-    
-    private void castSpell(SpellDetectionResult result) {
-        try {
-            MinecraftClient client = MinecraftClient.getInstance();
-            if (client.player == null) return;
-            
-            // Get player's look direction for ray hint
-            Vec3d lookVec = client.player.getRotationVec(1.0f);
-            
-            // Send cast intent to server
-            YellSpellsNetworking.sendCastIntent(
-                result.getSpellId(),
-                result.getConfidence(),
-                client.player.age, // client tick
-                System.currentTimeMillis(),
-                lookVec.x, lookVec.y, lookVec.z
-            );
-            
-            // Update HUD
-            SpellHUD hud = com.yellspells.client.YellSpellsClientMod.getSpellHUD();
-            if (hud != null) {
-                hud.onSpellCast(result.getSpellId(), result.getConfidence());
-            }
-            
-            YellSpellsMod.LOGGER.info("Cast spell: {} with confidence: {}", 
-                result.getSpellId(), result.getConfidence());
-                
-        } catch (Exception e) {
-            YellSpellsMod.LOGGER.error("Failed to cast spell", e);
-        }
-    }
-    
-    public boolean isRunning() {
-        return running.get();
-    }
+      }
+    });
+  }
+
+  private void sendIntent(CastIntentPacket pkt) {
+    MinecraftClient.getInstance().execute(() -> com.yellspells.client.net.ClientSender.sendIntent(pkt));
+  }
+
+  private String getDefaultModelPath() {
+    // TODO: resolve from your model manager/cache dir
+    return System.getProperty("user.home") + "/.yellspells/models/ggml-tiny.en.bin";
+  }
 }

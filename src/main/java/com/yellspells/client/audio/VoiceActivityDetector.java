@@ -1,36 +1,52 @@
 package com.yellspells.client.audio;
 
-public class VoiceActivityDetector {
-    private final float threshold;
-    private static final int MIN_ACTIVITY_SAMPLES = 1600; // 100ms at 16kHz
-    
-    public VoiceActivityDetector(float threshold) {
-        this.threshold = threshold;
+public final class VoiceActivityDetector {
+
+  private final float attack;      // e.g., 0.005f
+  private final float release;     // e.g., 0.003f
+  private final int   minFrames;   // e.g., 6 frames @16k (≈120ms) to confirm speech
+
+  private float noise = 0.02f;
+  private boolean speaking = false;
+  private int voicedCount = 0;
+
+  public VoiceActivityDetector(float attack, float release, int minFrames) {
+    this.attack = attack;
+    this.release = release;
+    this.minFrames = minFrames;
+  }
+
+  public boolean update(float[] block, int len) {
+    // simple RMS
+    float rms = 0f;
+    for (int i = 0; i < len; i++) {
+      float s = block[i];
+      rms += s * s;
     }
-    
-    public boolean hasVoiceActivity(float[] audioData) {
-        if (audioData.length < MIN_ACTIVITY_SAMPLES) {
-            return false;
+    rms = (float)Math.sqrt(rms / Math.max(1, len));
+
+    // adapt noise floor
+    noise = (speaking ? noise * (1 - release) + rms * release
+                      : noise * (1 - attack) + rms * attack);
+
+    float hi = noise * 3.0f;
+    float lo = noise * 1.5f;
+
+    if (speaking) {
+      if (rms < lo) {
+        speaking = false;
+        voicedCount = 0;
+      }
+    } else {
+      if (rms > hi) {
+        if (++voicedCount >= minFrames) {
+          speaking = true;
+          voicedCount = 0;
         }
-        
-        // Calculate RMS (Root Mean Square) energy
-        double rms = calculateRMS(audioData);
-        
-        // Audio is already normalized to -1.0 to 1.0
-        return rms > threshold;
+      } else {
+        voicedCount = 0;
+      }
     }
-    
-    private double calculateRMS(float[] audioData) {
-        double sum = 0.0;
-        
-        for (float sample : audioData) {
-            sum += (double) sample * sample;
-        }
-        
-        return Math.sqrt(sum / audioData.length);
-    }
-    
-    public float getThreshold() {
-        return threshold;
-    }
+    return speaking;
+  }
 }

@@ -11,26 +11,34 @@ extern "C" {
 /*
  * Class:     com_yellspells_client_stt_WhisperJNI
  * Method:    nativeInit
- * Signature: (Ljava/lang/String;)J
+ * Signature: (Ljava/lang/String;II)J
  */
 JNIEXPORT jlong JNICALL Java_com_yellspells_client_stt_WhisperJNI_nativeInit
-  (JNIEnv *, jobject, jstring);
+  (JNIEnv *, jclass, jstring, jint, jint);
 
 /*
  * Class:     com_yellspells_client_stt_WhisperJNI
- * Method:    nativeTranscribe
- * Signature: (JLjava/nio/FloatBuffer;ILjava/nio/ByteBuffer;)I
+ * Method:    nativePush
+ * Signature: (JLjava/nio/FloatBuffer;I)I
  */
-JNIEXPORT jint JNICALL Java_com_yellspells_client_stt_WhisperJNI_nativeTranscribe
-  (JNIEnv *, jobject, jlong, jobject, jint, jobject);
+JNIEXPORT jint JNICALL Java_com_yellspells_client_stt_WhisperJNI_nativePush
+  (JNIEnv *, jclass, jlong, jobject, jint);
 
 /*
  * Class:     com_yellspells_client_stt_WhisperJNI
- * Method:    nativeCleanup
+ * Method:    nativePoll
+ * Signature: (JLjava/nio/ByteBuffer;)Z
+ */
+JNIEXPORT jboolean JNICALL Java_com_yellspells_client_stt_WhisperJNI_nativePoll
+  (JNIEnv *, jclass, jlong, jobject);
+
+/*
+ * Class:     com_yellspells_client_stt_WhisperJNI
+ * Method:    nativeClose
  * Signature: (J)V
  */
-JNIEXPORT void JNICALL Java_com_yellspells_client_stt_WhisperJNI_nativeCleanup
-  (JNIEnv *, jobject, jlong);
+JNIEXPORT void JNICALL Java_com_yellspells_client_stt_WhisperJNI_nativeClose
+  (JNIEnv *, jclass, jlong);
 
 #ifdef __cplusplus
 }

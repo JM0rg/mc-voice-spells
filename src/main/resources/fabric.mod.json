@@ -3,36 +3,22 @@
   "id": "yellspells",
   "version": "${version}",
   "name": "YellSpells",
-  "description": "Voice spellcasting mod for Minecraft using Simple Voice Chat and on-device speech recognition",
-  "authors": [
-    "YellSpells Team"
-  ],
-  "contact": {
-    "homepage": "https://github.com/yellspells/yellspells",
-    "sources": "https://github.com/yellspells/yellspells"
-  },
+  "description": "Client-side voice spellcasting via Simple Voice Chat + whisper.cpp",
   "license": "MIT",
-  "icon": "assets/yellspells/icon.png",
   "environment": "*",
   "entrypoints": {
-    "main": [
-      "com.yellspells.YellSpellsMod"
-    ],
-    "client": [
-      "com.yellspells.client.YellSpellsClientMod"
-    ]
+    "main":   [ "com.yellspells.YellSpellsMod" ],
+    "client": [ "com.yellspells.client.YellSpellsClientMod" ],
+    "voicechat": [ "com.yellspells.client.audio.SVCAudioIntegration" ]
   },
-  "mixins": [
-    "yellspells.mixins.json"
-  ],
+  "mixins": [ "yellspells.mixins.json" ],
   "depends": {
     "fabricloader": ">=0.15.0",
     "minecraft": "~1.21.8",
-    "java": ">=17",
-    "fabric-api": "*",
-    "voicechat-api": ">=2.5.0"
+    "fabric-api": ">=0.131.0",
+    "java": ">=17"
   },
   "suggests": {
-    "simple-voice-chat": ">=2.5.0"
+    "voicechat": "*"
   }
 }

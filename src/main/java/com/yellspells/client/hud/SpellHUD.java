@@ -1,5 +1,9 @@
 package com.yellspells.client.hud;
 
+import com.yellspells.YellSpellsMod;
+import com.yellspells.config.YellSpellsConfig;
+import net.fabricmc.api.Environment;
+import net.fabricmc.api.EnvType;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
@@ -8,6 +12,7 @@ import net.minecraft.text.Text;
 
 import java.util.concurrent.atomic.AtomicLong;
 
+@Environment(EnvType.CLIENT)
 public class SpellHUD {
     private String currentTranscript = "";
     private float currentConfidence = 0.0f;
