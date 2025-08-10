@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8.2",
+  "package": "io.github.freshsupasulley.censorcraft.mixins",  
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "GUIMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

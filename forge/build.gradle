@@ -1,0 +1,326 @@
+// Shading tutorial: https://gist.github.com/SizableShrimp/949e7c219bfc94487a45226b64ac7749
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    // Too stubborn to get johnrengelman poison ass library to work so we're using the goated one
+	// I keep getting unsupported major version 65 meaning it's probably an easy fix but idgaf
+	// id 'com.github.johnrengelman.shadow' version '8.1.1'
+	id 'com.gradleup.shadow' version '9.0.0-beta12'
+    id 'net.minecraftforge.gradle' version "${mcf_range}"
+	id 'org.spongepowered.mixin' version '0.7.+'
+	//id 'org.parchmentmc.librarian.forgegradle' version '1.+'
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = mod_id
+}
+
+def rawVersion = System.getProperty('java.version')
+def majorVersion = rawVersion.tokenize('.')[0].toInteger()
+
+// Because mappings doesn't seem to cooperate when you're using a higher version (like 23). Probably due to a Gradle / Java mismatch problem
+// ^ i think i'm wrong. Building for 21 toolchain is enough
+//if (majorVersion != 21) {
+//    throw new GradleException("JVM version 21 is required because mappings won't download otherwise. Detected: ${rawVersion}")
+//}
+
+println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
+def runtime = Runtime.getRuntime()
+def mb = 1024 * 1024
+println "Max heap memory: ${runtime.maxMemory() / mb} MB"
+println "Total memory: ${runtime.totalMemory() / mb} MB"
+println "Free memory: ${runtime.freeMemory() / mb} MB"
+
+minecraft {
+    // The mappings can be changed at any time and must be in the following format.
+    // Channel:   Version:
+    // official   MCVersion             Official field/method names from Mojang mapping files
+    // parchment  YYYY.MM.DD-MCVersion  Open community-sourced parameter names and javadocs layered on top of official
+    //
+    // Parchment is an unofficial project maintained by ParchmentMC, separate from MinecraftForge
+    // Additional setup is needed to use their mappings: https://parchmentmc.org/docs/getting-started
+    //
+    // Simply re-run your setup task after changing the mappings to update your workspace.
+    mappings channel: mapping_channel, version: mapping_version
+
+    // Forge 1.20.6 and newer use official mappings at runtime, so we shouldn't reobf from official to SRG
+    reobf = false
+
+    // When true, this property will have all Eclipse/IntelliJ IDEA run configurations run the "prepareX" task for the given run configuration before launching the game.
+    // In most cases, it is not necessary to enable.
+    // enableEclipsePrepareRuns = true
+    // enableIdeaPrepareRuns = true
+
+    // This property allows configuring Gradle's ProcessResources task(s) to run on IDE output locations before launching the game.
+    // It is REQUIRED to be set to true for this template to function.
+    // See https://docs.gradle.org/current/dsl/org.gradle.language.jvm.tasks.ProcessResources.html
+    copyIdeResources = true
+
+    // When true, this property will add the folder name of all declared run configurations to generated IDE run configurations.
+    // The folder name can be set on a run configuration using the "folderName" property.
+    // By default, the folder name of a run configuration is the name of the Gradle project containing it.
+    // generateRunFolders = true
+
+    // This property enables access transformers for use in development, applied to the Minecraft artifact.
+    // The access transformer file can be anywhere in the project.
+    // However, it must be at "META-INF/accesstransformer.cfg" in the final mod jar to be loaded by Forge.
+    // This default location is a best practice to automatically put the file in the right place in the final jar.
+    // See https://docs.minecraftforge.net/en/latest/advanced/accesstransformers/ for more information.
+    // accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
+
+    // Default run configurations.
+    // These can be tweaked, removed, or duplicated as needed.
+    runs {
+        // applies to all the run configs below
+        configureEach {
+            workingDirectory project.file('run')
+
+            // Optional additional logging. The markers can be added/remove as needed, separated by commas.
+            // "SCAN": For mods scan.
+            // "REGISTRIES": For firing of registry events.
+            // "REGISTRYDUMP": For getting the contents of all registries.
+//            property 'forge.logging.markers', 'REGISTRIES'
+
+            property 'forge.logging.console.level', 'debug'
+
+            // Recommended for development - enables more descriptive errors at the cost of slower startup and registration.
+            property 'eventbus.api.strictRuntimeChecks', 'true'
+            // does this even do anything
+            //arg "-mixin.config=${mod_id}.mixins.json"
+        }
+
+        client {
+			// Use random username to not clash with others so I can test multiplayer
+			String tempUsername = "";
+			for(int i = 0; i < 10; i++) {
+				int random = 65 + (int) (26 * Math.random());
+				tempUsername += (char) random;
+			}
+			
+            property 'forge.enabledGameTestNamespaces', mod_id
+            // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
+			args '--username', tempUsername
+        }
+
+        server {
+            property 'forge.enabledGameTestNamespaces', mod_id
+            args '--nogui'
+        }
+
+        // This run config launches GameTestServer and runs all registered gametests, then exits.
+        // By default, the server will crash when no gametests are provided.
+        // The gametest system is also enabled by default for other run configs under the /test command.
+        gameTestServer {
+            property 'forge.enabledGameTestNamespaces', mod_id
+        }
+
+        data {
+            // example of overriding the workingDirectory set in configureEach above
+            workingDirectory project.file('run-data')
+
+            // Specify the modid for data generation, where to output the resulting resource, and where to look for existing resources.
+            args '--mod', mod_id, '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
+        }
+    }
+}
+
+// Include resources generated by data generators.
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+repositories {
+    maven {
+        name = "henkelmax.public"
+        url = 'https://maven.maxhenkel.de/repository/public'
+    }
+    maven {
+        name = "Modrinth"
+        url = "https://api.modrinth.com/maven"
+        content {
+            includeGroup "maven.modrinth"
+        }
+    }
+    maven {
+        name = 'Forge'
+        url = 'https://maven.minecraftforge.net'
+    }
+    maven {
+        name = 'Minecraft libraries'
+        url = 'https://libraries.minecraft.net'
+    }
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'Sponge'
+                url = 'https://repo.spongepowered.org/repository/maven-public'
+            }
+        }
+        filter {
+            includeGroupAndSubgroups('org.spongepowered')
+        }
+    }
+    
+    // If you have mod jar dependencies in ./libs, you can declare them as a repository like so.
+    // See https://docs.gradle.org/current/userguide/declaring_repositories.html#sub:flat_dir_resolver
+    // flatDir {
+    //     dir 'libs'
+    // }
+
+    // If we're using mavenLocal in any subproject we depend on (:common), we also need to put it here
+    // mavenLocal()
+}
+
+configurations {
+	shade
+	implementation.extendsFrom(shade)
+}
+
+dependencies {
+    // Specify the version of Minecraft to use.
+    // Any artifact can be supplied so long as it has a "userdev" classifier artifact and is a compatible patcher artifact.
+    // The "userdev" classifier will be requested and setup by ForgeGradle.
+    // If the group id is "net.minecraft" and the artifact id is one of ["client", "server", "joined"],
+    // then special handling is done to allow a setup of a vanilla dependency without the use of an external repository.
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+
+    // The meat of this mod
+    shade project(":common")
+
+    // Forge 1.21.6+ uses EventBus 7, which shifts most of its runtime validation to compile-time via an annotation processor
+    // to improve performance in production environments. This line is required to enable said compile-time validation
+    // in your development environment, helping you catch issues early.
+    annotationProcessor 'net.minecraftforge:eventbus-validator:7.0-beta.10'
+    
+    // Simple voice chat + api
+    compileOnly "de.maxhenkel.voicechat:voicechat-api:${voicechat_api_version}"
+	runtimeOnly fg.deobf("maven.modrinth:simple-voice-chat:forge-${voicechat_version}")
+	
+	// Apply Mixin AP to generate refmap
+	annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+	
+	testImplementation libs.junit.jupiter
+    testImplementation 'org.slf4j:slf4j-simple:2.0.17'
+}
+
+// This block of code expands all declared replace properties in the specified resource targets.
+// A missing property will result in an error. Properties are expanded using ${} Groovy notation.
+// When "copyIdeResources" is enabled, this will also run before the game launches in IDE environments.
+// See https://docs.gradle.org/current/dsl/org.gradle.language.jvm.tasks.ProcessResources.html
+tasks.named('processResources', ProcessResources) {
+    var replaceProperties = [
+            minecraft_version: minecraft_version, minecraft_version_range: minecraft_version_range,
+            forge_version: forge_version, forge_version_range: forge_version_range,
+            loader_version_range: loader_version_range,
+            mod_id: mod_id, mod_name: mod_name, mod_license: mod_license, mod_version: mod_version,
+            mod_authors: mod_authors, mod_description: mod_description,
+    ]
+    inputs.properties replaceProperties
+
+	// fuck you
+	/*filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+		expand replaceProperties + [project: project]
+	}*/
+	filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+		expand project.properties + [project: project]
+	}
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+test {
+    testLogging.showStandardStreams = true
+}
+
+mixin {
+	//add sourceSets.main, 'censorcraft.refmap.json'
+	config "censorcraft.mixins.json"
+}
+
+jar {
+    // We are only using shading, no need for jar task
+	enabled = false
+	manifest {
+		attributes([
+			'MixinConfigs': 'censorcraft.mixins.json',
+			'Specification-Title'	 : mod_id,
+			'Specification-Vendor'	: mod_authors,
+			'Specification-Version'   : '1',
+			'Implementation-Title'	: project.name,
+			'Implementation-Version'  : project.jar.archiveVersion,
+			'Implementation-Vendor'   : mod_authors,
+			'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+		])
+	}
+}
+
+shadowJar {
+	// Set classifier to an empty string (final jar name)
+    archiveClassifier.set("")
+    
+    // Bundled Vulkan natives has this for git reasons but we don't need it in the jar
+    exclude "**/.gitkeep"
+    
+    // Relocate external jars to limit conflictions
+    relocate 'org.json', 'io.github.freshsupasulley.json'
+    
+    // Only shade dependencies go into fat jar
+    configurations = [project.configurations.shade]
+    
+    // Exclude slf4j-api from the final bundled JAR
+    dependencies {
+        exclude(dependency("org.slf4j:slf4j-api:2.0.16"))
+    }
+    
+    //finalizedBy 'reobfShadowJar'
+}
+
+assemble.dependsOn shadowJar
+
+/*
+reobf {
+	shadowJar {}
+}
+/*
+eclipse {
+    synchronizationTasks 'genEclipseRuns'
+}
+*/
+
+// Example configuration to allow publishing using the maven-publish plugin
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            artifact jar
+        }
+    }
+    repositories {
+        maven {
+            url "file://${project.projectDir}/mcmodsrepo"
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
+}
+
+eclipse {
+    // Run everytime eclipse builds the code
+    //autoBuildTasks genEclipseRuns
+    // Run when importing the project
+    synchronizationTasks 'genEclipseRuns'
+}
+
+// Merge the resources and classes into the same directory, because Java expects modules to be in a single directory.
+// And if we have it in multiple we have to do performance intensive hacks like having the UnionFileSystem
+// This will eventually be migrated to ForgeGradle so modders don't need to manually do it. But that is later.
+sourceSets.each {
+    def dir = layout.buildDirectory.dir("sourcesSets/$it.name")
+    it.output.resourcesDir = dir
+    it.java.destinationDirectory = dir
+}
