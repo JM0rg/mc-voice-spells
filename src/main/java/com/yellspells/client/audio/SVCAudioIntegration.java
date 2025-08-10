@@ -23,9 +23,8 @@ public final class SVCAudioIntegration implements VoicechatPlugin {
     reg.registerEvent(MicrophoneMuteEvent.class, e -> muted = e.isDisabled());
     reg.registerEvent(ClientSoundEvent.class, e -> {
       if (!connected || muted) return;
-      short[] pcm48 = e.getRawAudio(); // 20ms @ 48kHz, mono, 16-bit
-      // Do not block here; hand off to our processor
-      YellSpellsClientMod.audioProcessor().onPcm48Frame(pcm48);
+      short[] pcm48 = e.getRawAudio();              // 20ms @48kHz mono 16-bit
+      YellSpellsClientMod.getAudioProcessor().onPcm48Frame(pcm48); // hand off quickly (non-blocking)
     });
   }
 }

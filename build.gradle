@@ -7,21 +7,20 @@ group = project.maven_group
 version = project.mod_version
 
 repositories {
-  maven { url = "https://maven.fabricmc.net/" }                    // Fabric
-  maven { url = "https://api.modrinth.com/maven" }                 // SVC mod (dev runtime)
-  maven { url = "https://maven.maxhenkel.de/repository/public" }   // SVC API
-  mavenCentral()
+    maven { name = "Fabric";    url = "https://maven.fabricmc.net/" }
+    maven { name = "Modrinth";  url = "https://api.modrinth.com/maven" }           // SVC mod at dev runtime
+    maven { name = "MaxHenkel"; url = "https://maven.maxhenkel.de/repository/public" } // SVC API
+    mavenCentral()
 }
 
 dependencies {
-  minecraft "com.mojang:minecraft:${minecraft_version}"
-  mappings loom.officialMojangMappings()
-  modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
-  modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+    // Fabric
+    modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
 
-  // Simple Voice Chat - API is a plain library; bring the mod at dev runtime so addon entrypoint loads
-  implementation "de.maxhenkel.voicechat:voicechat-api:${svc_version}"
-  modRuntimeOnly "maven.modrinth:simple-voice-chat:fabric-${svc_version}"
+    // Simple Voice Chat
+    implementation "de.maxhenkel.voicechat:voicechat-api:${svc_version}"                // API is a normal library
+    modRuntimeOnly "maven.modrinth:simple-voice-chat:fabric-${svc_version}"             // bring the mod in runClient
 }
 
 java {
