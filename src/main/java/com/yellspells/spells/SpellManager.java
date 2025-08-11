@@ -146,62 +146,7 @@ public class SpellManager {
         YellSpellsMod.LOGGER.info("SpellManager cleaned up");
     }
     
-    /**
-     * Direct spell execution for debug commands (bypasses network packet validation)
-     */
-    public boolean executeSpell(ServerPlayerEntity player, String spellName, Vec3d targetPos) {
-        try {
-            // Get spell configuration
-            YellSpellsConfig.SpellConfig spellConfig = config.getSpell(spellName);
-            if (spellConfig == null) {
-                YellSpellsMod.LOGGER.warn("Unknown spell {} requested by {}", spellName, player.getName().getString());
-                return false;
-            }
-            
-            // Check cooldown
-            if (isOnCooldown(player.getUuid(), spellName, spellConfig.cooldown)) {
-                YellSpellsMod.LOGGER.info("Spell {} on cooldown for player {}", spellName, player.getName().getString());
-                return false;
-            }
-            
-            // Check global cooldown
-            if (isOnCooldown(player.getUuid(), "global", config.globalCooldown)) {
-                YellSpellsMod.LOGGER.info("Global cooldown active for player {}", player.getName().getString());
-                return false;
-            }
-            
-            // Create a mock packet for the executor
-            CastIntentPacket mockPacket = new CastIntentPacket(
-                spellName, 
-                1.0f, // max confidence for debug
-                player.getWorld().getTime(),
-                System.currentTimeMillis(),
-                targetPos.x, targetPos.y, targetPos.z,
-                0, // nonce
-                new byte[32] // hmac
-            );
-            
-            // Execute spell
-            SpellExecutor executor = spellExecutors.get(spellName);
-            if (executor != null) {
-                executor.execute(player, mockPacket);
-                
-                // Set cooldowns
-                setCooldown(player.getUuid(), spellName, spellConfig.cooldown);
-                setCooldown(player.getUuid(), "global", config.globalCooldown);
-                
-                YellSpellsMod.LOGGER.info("Debug command: Spell {} cast by {}", spellName, player.getName().getString());
-                return true;
-            } else {
-                YellSpellsMod.LOGGER.warn("No executor found for spell {}", spellName);
-                return false;
-            }
-            
-        } catch (Exception e) {
-            YellSpellsMod.LOGGER.error("Failed to execute debug spell for player {}", player.getName().getString(), e);
-            return false;
-        }
-    }
+
     
     public interface SpellExecutor {
         void execute(ServerPlayerEntity player, CastIntentPacket packet);
