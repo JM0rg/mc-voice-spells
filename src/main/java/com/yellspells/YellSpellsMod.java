@@ -1,11 +1,9 @@
 package com.yellspells;
 
-import com.yellspells.commands.CastCommand;
 import com.yellspells.config.YellSpellsConfig;
 import com.yellspells.network.YellSpellsNetworking;
 import com.yellspells.spells.SpellManager;
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.util.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,11 +28,6 @@ public final class YellSpellsMod implements ModInitializer {
     
     // Register networking
     YellSpellsNetworking.registerServer();
-    
-    // Register debug command
-    CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-      CastCommand.register(dispatcher);
-    });
     
     LOGGER.info("YellSpells mod initialized");
   }

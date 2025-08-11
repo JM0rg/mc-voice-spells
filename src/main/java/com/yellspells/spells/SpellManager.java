@@ -22,16 +22,9 @@ import java.util.UUID;
 public class SpellManager {
     private final YellSpellsConfig config;
     private final Map<UUID, Map<String, Long>> playerCooldowns = new HashMap<>();
-    private final Map<String, SpellExecutor> spellExecutors = new HashMap<>();
     
     public SpellManager(YellSpellsConfig config) {
         this.config = config;
-        registerSpellExecutors();
-    }
-    
-    private void registerSpellExecutors() {
-        // Only fireball for testing
-        spellExecutors.put("fireball", new FireballSpell());
     }
     
     public void processCastIntent(ServerPlayerEntity player, CastIntentPacket packet) {
@@ -71,20 +64,15 @@ public class SpellManager {
                 }
             }
             
-            // Execute spell
-            SpellExecutor executor = spellExecutors.get(packet.spellId);
-            if (executor != null) {
-                executor.execute(player, packet);
-                
-                // Set cooldowns
-                setCooldown(player.getUuid(), packet.spellId, spellConfig.cooldown);
-                setCooldown(player.getUuid(), "global", config.globalCooldown);
-                
-                YellSpellsMod.LOGGER.info("Spell {} cast by {} with confidence {}", 
-                    packet.spellId, player.getName().getString(), packet.confidence);
-            } else {
-                YellSpellsMod.LOGGER.warn("No executor found for spell {}", packet.spellId);
-            }
+            // Execute spell command
+            executeSpellCommand(player, packet.spellId);
+            
+            // Set cooldowns
+            setCooldown(player.getUuid(), packet.spellId, spellConfig.cooldown);
+            setCooldown(player.getUuid(), "global", config.globalCooldown);
+            
+            YellSpellsMod.LOGGER.info("Spell {} cast by {} with confidence {}", 
+                packet.spellId, player.getName().getString(), packet.confidence);
             
         } catch (Exception e) {
             YellSpellsMod.LOGGER.error("Failed to process cast intent for player {}", player.getName().getString(), e);
@@ -146,9 +134,26 @@ public class SpellManager {
         YellSpellsMod.LOGGER.info("SpellManager cleaned up");
     }
     
-
-    
-    public interface SpellExecutor {
-        void execute(ServerPlayerEntity player, CastIntentPacket packet);
+    /**
+     * Execute a spell by running the corresponding /cast command
+     */
+    private void executeSpellCommand(ServerPlayerEntity player, String spellId) {
+        try {
+            MinecraftServer server = player.getServer();
+            if (server != null) {
+                String command = "cast " + spellId;
+                YellSpellsMod.LOGGER.info("Executing command for player {}: /{}", player.getName().getString(), command);
+                
+                // Execute the command as the player
+                server.getCommandManager().executeWithPrefix(
+                    player.getCommandSource().withSilent(),
+                    command
+                );
+            } else {
+                YellSpellsMod.LOGGER.error("Server is null, cannot execute spell command for player {}", player.getName().getString());
+            }
+        } catch (Exception e) {
+            YellSpellsMod.LOGGER.error("Failed to execute spell command for player {}: {}", player.getName().getString(), spellId, e);
+        }
     }
 }

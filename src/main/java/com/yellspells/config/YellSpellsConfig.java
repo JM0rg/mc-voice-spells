@@ -39,7 +39,7 @@ public class YellSpellsConfig {
     public boolean enableRaycastValidation = true;
     
     public YellSpellsConfig() {
-        // Initialize default spells - only fireball for testing
+        // Initialize default spells - spells are now handled by Magic System mod via /cast commands
         spells.put("fireball", new SpellConfig("fireball", 2000, 0.6f, true));
     }
     

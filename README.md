@@ -49,18 +49,22 @@ Each spell can be configured with:
 - `confidenceThreshold`: Minimum confidence for this spell
 - `requiresTarget`: Whether the spell requires a target
 
+### Spell Integration
+YellSpells now integrates with the Magic System mod for spell implementations:
+- **Voice Detection**: YellSpells handles speech-to-text and keyword detection
+- **Spell Execution**: Magic System mod handles actual spell casting via `/cast` commands
+- **Seamless Integration**: Voice commands automatically trigger the appropriate spell commands
+
 ### Default Spells
-- **Fireball**: Creates a fireball projectile
-- **Lightning**: Strikes lightning at target location
-- **Heal**: Restores player health
-- **Shield**: Provides temporary resistance
+- **Fireball**: Say "fireball" to execute `/cast fireball` command
 
 ## Usage
 
-1. Join a server with YellSpells installed
-2. Speak a spell keyword clearly into your microphone
-3. The mod will detect the keyword and cast the spell
-4. Check the HUD for transcript and confidence information
+1. Install both YellSpells and Magic System mods
+2. Join a server with both mods installed
+3. Speak a spell keyword clearly into your microphone (e.g., "fireball")
+4. YellSpells will detect the keyword and execute the corresponding `/cast` command
+5. Check the HUD for transcript and confidence information
 
 ## Development
 
@@ -75,7 +79,7 @@ Each spell can be configured with:
 - `src/main/java/com/yellspells/` - Main mod classes
 - `src/main/java/com/yellspells/client/` - Client-side components
 - `src/main/java/com/yellspells/network/` - Networking and packets
-- `src/main/java/com/yellspells/spells/` - Spell implementations
+- `src/main/java/com/yellspells/spells/` - Spell command execution
 - `src/main/java/com/yellspells/config/` - Configuration system
 
 ### Key Components
@@ -85,14 +89,14 @@ Each spell can be configured with:
 3. **AudioResampler**: High-quality polyphase filter for audio conversion
 4. **SpeechToTextManager**: Manages whisper.cpp JNI integration
 5. **SpellDetector**: Detects spells from transcriptions with stability checking
-6. **SpellManager**: Server-side spell execution and validation
+6. **SpellManager**: Server-side command execution and validation
 7. **YellSpellsNetworking**: Secure client-server communication with HMAC signing
 
 ### Adding New Spells
 
-1. Create a new spell class implementing `SpellManager.SpellExecutor`
-2. Register it in `SpellManager.registerSpellExecutors()`
-3. Add configuration in `YellSpellsConfig`
+1. Create the spell implementation in the Magic System mod
+2. Add the spell keyword to YellSpells configuration in `YellSpellsConfig`
+3. The voice command will automatically execute `/cast <spellname>` when detected
 
 ## Security
 

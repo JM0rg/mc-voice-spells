@@ -17,16 +17,29 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(whisper)
 
+# Configure whisper to build as static library
+set(WHISPER_BUILD_SHARED OFF CACHE BOOL "Build shared library" FORCE)
+set(WHISPER_BUILD_TESTS OFF CACHE BOOL "Build tests" FORCE)
+set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "Build examples" FORCE)
+
 # Create our JNI library
 add_library(yellspells_whisper SHARED
     cpp/yellspells_whisper.cpp
 )
 
-# Link with whisper and JNI
+# Simple linking - let CMake handle the dependencies
 target_link_libraries(yellspells_whisper 
-    whisper 
+    whisper
     ${JNI_LIBRARIES}
 )
+
+# Set RPATH to be relative to the library itself on macOS
+if(APPLE)
+    set_target_properties(yellspells_whisper PROPERTIES
+        INSTALL_RPATH "@loader_path"
+        BUILD_WITH_INSTALL_RPATH TRUE
+    )
+endif()
 
 # Include whisper headers
 target_include_directories(yellspells_whisper PRIVATE 
@@ -60,6 +73,20 @@ add_custom_command(TARGET yellspells_whisper POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory ${NATIVE_OUTPUT_DIR}
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:yellspells_whisper> ${NATIVE_OUTPUT_DIR}/
 )
+
+# On macOS, also copy all whisper dependencies to the same directory
+if(APPLE)
+    add_custom_command(TARGET yellspells_whisper POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:whisper> ${NATIVE_OUTPUT_DIR}/
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:ggml> ${NATIVE_OUTPUT_DIR}/
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:ggml-cpu> ${NATIVE_OUTPUT_DIR}/
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:ggml-blas> ${NATIVE_OUTPUT_DIR}/
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:ggml-metal> ${NATIVE_OUTPUT_DIR}/
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:ggml-base> ${NATIVE_OUTPUT_DIR}/
+        # Also create the versioned filename that the library expects
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:whisper> ${NATIVE_OUTPUT_DIR}/libwhisper.1.dylib
+    )
+endif()
 
 # Compiler-specific optimizations
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")

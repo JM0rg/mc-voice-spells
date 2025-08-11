@@ -35,6 +35,11 @@ public final class WhisperJNI {
     }
     
     try {
+      // On macOS, we need to load all dependencies first
+      if (osName.contains("mac")) {
+        loadMacOSDependencies();
+      }
+      
       // Try to load from bundled resources first
       java.io.InputStream is = WhisperJNI.class.getResourceAsStream(libPath);
       if (is != null) {
@@ -56,6 +61,42 @@ public final class WhisperJNI {
     
     // Fall back to system library loading
     System.loadLibrary("yellspells_whisper");
+  }
+  
+  private static void loadMacOSDependencies() {
+    try {
+      // Load all required dependencies in the correct order
+      String[] deps = {
+        "/natives/macos/libggml-base.dylib",
+        "/natives/macos/libggml-blas.dylib", 
+        "/natives/macos/libggml-cpu.dylib",
+        "/natives/macos/libggml-metal.dylib",
+        "/natives/macos/libggml.dylib",
+        "/natives/macos/libwhisper.1.7.6.dylib"
+      };
+      
+      for (String dep : deps) {
+        java.io.InputStream is = WhisperJNI.class.getResourceAsStream(dep);
+        if (is != null) {
+          String fileName = dep.substring(dep.lastIndexOf('/') + 1);
+          java.nio.file.Path tempLib = java.nio.file.Files.createTempFile(
+            fileName.substring(0, fileName.lastIndexOf('.')), 
+            fileName.substring(fileName.lastIndexOf('.'))
+          );
+          java.nio.file.Files.copy(is, tempLib, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+          is.close();
+          
+          System.load(tempLib.toAbsolutePath().toString());
+          tempLib.toFile().deleteOnExit();
+          
+          YellSpellsMod.LOGGER.debug("Loaded dependency: {}", fileName);
+        } else {
+          YellSpellsMod.LOGGER.warn("Could not find dependency: {}", dep);
+        }
+      }
+    } catch (Exception e) {
+      YellSpellsMod.LOGGER.error("Failed to load macOS dependencies", e);
+    }
   }
 
   private long ctx;
