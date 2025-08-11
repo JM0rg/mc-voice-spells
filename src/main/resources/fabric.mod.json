@@ -13,12 +13,11 @@
   },
   "mixins": ["yellspells.mixins.json"],
   "depends": {
-    "fabricloader": ">=0.15.0",
+    "fabricloader": ">=0.17.2",
     "minecraft": "~1.21.8",
     "fabric-api": ">=0.131.0",
-    "java": ">=17"
+    "java": ">=21",
+    "voicechat": ">=${minecraft_version}-${voicechat_api_version}"
   },
-  "suggests": {
-    "voicechat": "*"
-  }
+  "suggests": { }
 }

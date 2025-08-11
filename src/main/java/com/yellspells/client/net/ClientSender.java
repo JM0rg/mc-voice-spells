@@ -9,8 +9,6 @@ public final class ClientSender {
   private ClientSender() {}
 
   public static void sendIntent(CastIntentPacket pkt) {
-    var buf = PacketByteBufs.create();
-    pkt.write(buf);
-    ClientPlayNetworking.send(YellSpellsNetworking.INTENT_ID, buf);
+    ClientPlayNetworking.send(pkt);
   }
 }

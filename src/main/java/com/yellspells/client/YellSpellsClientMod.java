@@ -18,4 +18,6 @@ public final class YellSpellsClientMod implements ClientModInitializer {
   }
 
   public static AudioProcessor audioProcessor() { return AUDIO; }
+  
+  public static AudioProcessor getAudioProcessor() { return AUDIO; }
 }

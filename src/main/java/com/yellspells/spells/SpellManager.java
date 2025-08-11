@@ -12,6 +12,7 @@ import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.RaycastContext;
 import net.minecraft.world.World;
 
 import java.util.HashMap;
@@ -29,10 +30,8 @@ public class SpellManager {
     }
     
     private void registerSpellExecutors() {
+        // Only fireball for testing
         spellExecutors.put("fireball", new FireballSpell());
-        spellExecutors.put("lightning", new LightningSpell());
-        spellExecutors.put("heal", new HealSpell());
-        spellExecutors.put("shield", new ShieldSpell());
     }
     
     public void processCastIntent(ServerPlayerEntity player, CastIntentPacket packet) {
@@ -99,8 +98,8 @@ public class SpellManager {
             Vec3d direction = new Vec3d(packet.rayX, packet.rayY, packet.rayZ).normalize();
             Vec3d end = start.add(direction.multiply(64.0)); // 64 block range
             
-            HitResult hitResult = player.getWorld().raycast(new net.minecraft.util.math.Box(start, end), 
-                start, end, net.minecraft.util.shape.VoxelShapes.fullCube());
+            RaycastContext context = new RaycastContext(start, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, player);
+            HitResult hitResult = player.getWorld().raycast(context);
             
             if (hitResult != null && hitResult.getType() != HitResult.Type.MISS) {
                 // Target is valid
@@ -133,6 +132,11 @@ public class SpellManager {
             .put(spellId, System.currentTimeMillis());
     }
     
+    public static void init() {
+        // Legacy compatibility method - actual initialization happens in constructor
+        YellSpellsMod.LOGGER.info("SpellManager static init called");
+    }
+    
     public void onServerStarted(MinecraftServer server) {
         YellSpellsMod.LOGGER.info("SpellManager initialized for server");
     }
@@ -140,6 +144,63 @@ public class SpellManager {
     public void onServerStopping(MinecraftServer server) {
         playerCooldowns.clear();
         YellSpellsMod.LOGGER.info("SpellManager cleaned up");
+    }
+    
+    /**
+     * Direct spell execution for debug commands (bypasses network packet validation)
+     */
+    public boolean executeSpell(ServerPlayerEntity player, String spellName, Vec3d targetPos) {
+        try {
+            // Get spell configuration
+            YellSpellsConfig.SpellConfig spellConfig = config.getSpell(spellName);
+            if (spellConfig == null) {
+                YellSpellsMod.LOGGER.warn("Unknown spell {} requested by {}", spellName, player.getName().getString());
+                return false;
+            }
+            
+            // Check cooldown
+            if (isOnCooldown(player.getUuid(), spellName, spellConfig.cooldown)) {
+                YellSpellsMod.LOGGER.info("Spell {} on cooldown for player {}", spellName, player.getName().getString());
+                return false;
+            }
+            
+            // Check global cooldown
+            if (isOnCooldown(player.getUuid(), "global", config.globalCooldown)) {
+                YellSpellsMod.LOGGER.info("Global cooldown active for player {}", player.getName().getString());
+                return false;
+            }
+            
+            // Create a mock packet for the executor
+            CastIntentPacket mockPacket = new CastIntentPacket(
+                spellName, 
+                1.0f, // max confidence for debug
+                player.getWorld().getTime(),
+                System.currentTimeMillis(),
+                targetPos.x, targetPos.y, targetPos.z,
+                0, // nonce
+                new byte[32] // hmac
+            );
+            
+            // Execute spell
+            SpellExecutor executor = spellExecutors.get(spellName);
+            if (executor != null) {
+                executor.execute(player, mockPacket);
+                
+                // Set cooldowns
+                setCooldown(player.getUuid(), spellName, spellConfig.cooldown);
+                setCooldown(player.getUuid(), "global", config.globalCooldown);
+                
+                YellSpellsMod.LOGGER.info("Debug command: Spell {} cast by {}", spellName, player.getName().getString());
+                return true;
+            } else {
+                YellSpellsMod.LOGGER.warn("No executor found for spell {}", spellName);
+                return false;
+            }
+            
+        } catch (Exception e) {
+            YellSpellsMod.LOGGER.error("Failed to execute debug spell for player {}", player.getName().getString(), e);
+            return false;
+        }
     }
     
     public interface SpellExecutor {

@@ -18,7 +18,8 @@ public class FireballSpell implements SpellManager.SpellExecutor {
             Vec3d direction = new Vec3d(packet.rayX, packet.rayY, packet.rayZ).normalize();
             
             // Create fireball entity
-            FireballEntity fireball = new FireballEntity(world, player, direction.x, direction.y, direction.z, 1);
+            FireballEntity fireball = new FireballEntity(EntityType.FIREBALL, world);
+            fireball.setOwner(player);
             
             // Set position at player's eye level
             fireball.setPosition(player.getEyePos());

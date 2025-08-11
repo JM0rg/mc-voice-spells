@@ -3,9 +3,9 @@ package com.yellspells.network;
 import com.yellspells.YellSpellsMod;
 import com.yellspells.network.packets.CastIntentPacket;
 import com.yellspells.network.packets.SessionKeyPacket;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerPlayConnectionEvents;
-import net.fabricmc.fabric.api.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.network.PacketByteBuf;
@@ -22,8 +22,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class YellSpellsNetworking {
 
+  // Legacy compatibility
   public static final Identifier CAST_INTENT_CHANNEL = YellSpellsMod.id("cast_intent");
   public static final Identifier SESSION_KEY_CHANNEL = YellSpellsMod.id("session_key");
+  public static final Identifier INTENT_ID = CAST_INTENT_CHANNEL;
 
   private static final Map<UUID, byte[]> SESSION_KEYS = new ConcurrentHashMap<>();
   private static final SecureRandom RNG = new SecureRandom();
@@ -32,15 +34,34 @@ public final class YellSpellsNetworking {
   private static volatile byte[] clientSessionKey;
 
   // ===== Server wiring =====
+  public static void registerServer() {
+    init();
+  }
+  
   public static void init() {
+    // Register payload types
+    PayloadTypeRegistry.playS2C().register(SessionKeyPacket.ID, SessionKeyPacket.CODEC);
+    PayloadTypeRegistry.playC2S().register(CastIntentPacket.ID, CastIntentPacket.CODEC);
+    
     // server receiver for intents
-    ServerPlayNetworking.registerGlobalReceiver(CAST_INTENT_CHANNEL, (server, player, handler, buf, response) -> {
-      CastIntentPacket pkt = CastIntentPacket.read(buf);
-      byte[] key = SESSION_KEYS.get(player.getUuid());
-      if (key == null || !verifyHmac(pkt, key)) return;
+    ServerPlayNetworking.registerGlobalReceiver(CastIntentPacket.ID, (payload, context) -> {
+      YellSpellsMod.LOGGER.info("Server: Received cast intent for spell '{}' from player {}", 
+        payload.spellId, context.player().getName().getString());
+      
+      byte[] key = SESSION_KEYS.get(context.player().getUuid());
+      if (key == null) {
+        YellSpellsMod.LOGGER.warn("Server: No session key found for player {}", context.player().getName().getString());
+        return;
+      }
+      
+      if (!verifyHmac(payload, key)) {
+        YellSpellsMod.LOGGER.warn("Server: HMAC verification failed for player {}", context.player().getName().getString());
+        return;
+      }
 
       // TODO: add skew/nonce/rate-limits here or in pkt.applyServer
-      server.execute(() -> pkt.applyServer(player));
+      YellSpellsMod.LOGGER.info("Server: Executing spell '{}' for player {}", payload.spellId, context.player().getName().getString());
+      context.server().execute(() -> payload.applyServer(context.player()));
     });
 
     // send per-session key on join, clear on disconnect
@@ -56,9 +77,9 @@ public final class YellSpellsNetworking {
   }
 
   private static void sendSessionKey(ServerPlayerEntity player, byte[] key) {
-    PacketByteBuf out = PacketByteBufs.create();
-    new SessionKeyPacket(key).write(out);
-    ServerPlayNetworking.send(player, SESSION_KEY_CHANNEL, out);
+    YellSpellsMod.LOGGER.info("Server: Sending session key to player {} (length: {})", 
+      player.getName().getString(), key.length);
+    ServerPlayNetworking.send(player, new SessionKeyPacket(key));
   }
 
   private static boolean verifyHmac(CastIntentPacket pkt, byte[] key) {
@@ -93,11 +114,21 @@ public final class YellSpellsNetworking {
   }
 
   // ===== Client wiring =====
+  public static void registerClient() {
+    initClient();
+  }
+  
   public static void initClient() {
-    ClientPlayNetworking.registerGlobalReceiver(SESSION_KEY_CHANNEL, (client, handler, buf, response) -> {
-      SessionKeyPacket pkt = SessionKeyPacket.read(buf);
-      client.execute(() -> clientSessionKey = pkt.sessionKey());
+    ClientPlayNetworking.registerGlobalReceiver(SessionKeyPacket.ID, (payload, context) -> {
+      context.client().execute(() -> {
+        clientSessionKey = payload.sessionKey();
+        YellSpellsMod.LOGGER.info("Received session key from server (length: {})", clientSessionKey.length);
+      });
     });
+  }
+
+  public static byte[] getClientSessionKey() {
+    return clientSessionKey;
   }
 
   public static void sendCastIntent(String spellId, float confidence, int clientTick, long timestamp,
@@ -106,12 +137,11 @@ public final class YellSpellsNetworking {
     byte[] key = clientSessionKey;
     if (key == null) return;
 
-    CastIntentPacket pkt = new CastIntentPacket(spellId, confidence, clientTick, timestamp, rayX, rayY, rayZ);
+    int nonce = RNG.nextInt();
+    CastIntentPacket pkt = new CastIntentPacket(spellId, confidence, clientTick, timestamp, rayX, rayY, rayZ, nonce, null);
     pkt.hmac = hmac(pkt, key);
 
-    PacketByteBuf out = PacketByteBufs.create();
-    pkt.write(out);
-    ClientPlayNetworking.send(CAST_INTENT_CHANNEL, out);
+    ClientPlayNetworking.send(pkt);
   }
 
   private static byte[] hmac(CastIntentPacket pkt, byte[] key) {

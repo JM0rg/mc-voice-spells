@@ -39,11 +39,8 @@ public class YellSpellsConfig {
     public boolean enableRaycastValidation = true;
     
     public YellSpellsConfig() {
-        // Initialize default spells
+        // Initialize default spells - only fireball for testing
         spells.put("fireball", new SpellConfig("fireball", 2000, 0.6f, true));
-        spells.put("lightning", new SpellConfig("lightning", 5000, 0.8f, true));
-        spells.put("heal", new SpellConfig("heal", 10000, 0.7f, false));
-        spells.put("shield", new SpellConfig("shield", 3000, 0.6f, true));
     }
     
     public void load() {

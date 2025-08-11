@@ -48,6 +48,30 @@ public class SpellDetector {
         return null;
     }
     
+    // Static method for backward compatibility
+    public static String detectKeyword(String transcript) {
+        // Simple keyword detection - just check if any spell keyword is present
+        if (transcript == null || transcript.trim().isEmpty()) {
+            return null;
+        }
+        
+        String lowerTranscript = transcript.toLowerCase().trim();
+        
+        // Check each configured spell
+        for (Map.Entry<String, YellSpellsConfig.SpellConfig> entry : 
+             YellSpellsMod.getConfig().spells.entrySet()) {
+            
+            String spellId = entry.getKey();
+            YellSpellsConfig.SpellConfig spellConfig = entry.getValue();
+            
+            if (lowerTranscript.contains(spellConfig.keyword.toLowerCase())) {
+                return spellId;
+            }
+        }
+        
+        return null;
+    }
+    
     private static class SpellDetectionHistory {
         private final float[] recentConfidences = new float[10];
         private int index = 0;

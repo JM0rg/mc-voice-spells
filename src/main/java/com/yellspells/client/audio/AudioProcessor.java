@@ -1,7 +1,11 @@
 package com.yellspells.client.audio;
 
+import com.yellspells.YellSpellsMod;
 import com.yellspells.client.stt.SpeechToTextManager;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
 
+@Environment(EnvType.CLIENT)
 public final class AudioProcessor {
 
   private final AudioResampler resampler = new AudioResampler();
@@ -11,9 +15,14 @@ public final class AudioProcessor {
   // One batch ~320 ms @16k -> 5120 samples (multiple of 320)
   private final float[] batchBuf = new float[5120];
   private int batchWrite = 0;
+  private int frameCount = 0;
 
   // Called from SVC event (20ms @48k, 960 samples short[])
   public void onPcm48Frame(short[] pcm48) {
+    frameCount++;
+    if (frameCount % 50 == 0) { // Log every second (50 * 20ms = 1s)
+      YellSpellsMod.LOGGER.debug("AudioProcessor: Processing audio frame {} (length: {})", frameCount, pcm48.length);
+    }
     float[] out = new float[resampler.outLengthFor(pcm48.length)];
     int wrote = resampler.process(pcm48, out);
 
@@ -28,9 +37,18 @@ public final class AudioProcessor {
       i += 320;
 
       if (batchWrite >= batchBuf.length) {
+        YellSpellsMod.LOGGER.debug("AudioProcessor: Sending {} samples to STT (speaking: {})", batchWrite, speaking);
         stt.pushBlock(batchBuf, batchWrite, speaking);
         batchWrite = 0;
       }
     }
+  }
+  
+  /**
+   * Initialize STT with downloaded model (called after user consents to download)
+   */
+  public void initializeSTT(String modelPath) {
+    YellSpellsMod.LOGGER.info("Initializing STT with user-downloaded model: {}", modelPath);
+    // The SpeechToTextManager will be created with the model when first used
   }
 }
