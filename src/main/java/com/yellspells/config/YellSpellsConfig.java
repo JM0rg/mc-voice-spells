@@ -41,6 +41,7 @@ public class YellSpellsConfig {
     public YellSpellsConfig() {
         // Initialize default spells - spells are now handled by Magic System mod via /cast commands
         spells.put("fireball", new SpellConfig("fireball", 2000, 0.6f, true));
+        spells.put("safedescent", new SpellConfig("safe descent", 40000, 0.6f, false));
     }
     
     public void load() {
@@ -63,20 +64,27 @@ public class YellSpellsConfig {
                 if (json.has("nonceWindow")) nonceWindow = json.get("nonceWindow").getAsInt();
                 if (json.has("enableRaycastValidation")) enableRaycastValidation = json.get("enableRaycastValidation").getAsBoolean();
                 
-                // Load spells
+                // Load spells (robust against missing fields)
                 if (json.has("spells")) {
                     JsonObject spellsJson = json.getAsJsonObject("spells");
                     spells.clear();
                     for (String key : spellsJson.keySet()) {
-                        JsonObject spellJson = spellsJson.getAsJsonObject(key);
-                        SpellConfig spell = new SpellConfig(
-                            spellJson.get("keyword").getAsString(),
-                            spellJson.get("cooldown").getAsInt(),
-                            spellJson.get("confidenceThreshold").getAsFloat(),
-                            spellJson.get("requiresTarget").getAsBoolean()
-                        );
-                        spells.put(key, spell);
+                        try {
+                            JsonObject spellJson = spellsJson.getAsJsonObject(key);
+                            String keywordVal = spellJson.has("keyword") ? spellJson.get("keyword").getAsString() : key;
+                            int cooldownVal = spellJson.has("cooldown") ? spellJson.get("cooldown").getAsInt() : 2000;
+                            float confidenceVal = spellJson.has("confidenceThreshold") ? spellJson.get("confidenceThreshold").getAsFloat() : this.confidenceThreshold;
+                            boolean requiresTargetVal = spellJson.has("requiresTarget") && spellJson.get("requiresTarget").getAsBoolean();
+                            SpellConfig spell = new SpellConfig(keywordVal, cooldownVal, confidenceVal, requiresTargetVal);
+                            spells.put(key, spell);
+                        } catch (Exception e) {
+                            YellSpellsMod.LOGGER.warn("Failed to parse spell config for key {}. Using defaults.", key, e);
+                            spells.put(key, new SpellConfig(key, 2000, this.confidenceThreshold, false));
+                        }
                     }
+                    // Ensure defaults exist if not present
+                    spells.putIfAbsent("fireball", new SpellConfig("fireball", 2000, 0.6f, true));
+                    spells.putIfAbsent("safedescent", new SpellConfig("safe descent", 40000, 0.6f, false));
                 }
                 
                 YellSpellsMod.LOGGER.info("Configuration loaded from {}", CONFIG_PATH);

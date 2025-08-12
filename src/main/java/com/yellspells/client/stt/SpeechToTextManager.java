@@ -56,11 +56,13 @@ public final class SpeechToTextManager {
   public void pushBlock(float[] block, int samples, boolean speaking) {
     exec.submit(() -> {
       if (!whisper.available()) {
-        YellSpellsMod.LOGGER.debug("STT: Whisper not available, skipping audio block");
+        // silent when not initialized
         return;
       }
-      
-      YellSpellsMod.LOGGER.info("STT: Processing {} samples (speaking: {})", samples, speaking);
+      // Only log when speaking
+      if (speaking) {
+        YellSpellsMod.LOGGER.info("STT: Processing {} samples (speaking: true)", samples);
+      }
       
       audioBuf.clear();
       audioBuf.put(block, 0, samples);
@@ -72,7 +74,9 @@ public final class SpeechToTextManager {
       float[] confStable = new float[2]; // [0]=confidence, [1]=isStable(0/1)
       int wrote = whisper.poll(textBuf, confStable);
       
-      YellSpellsMod.LOGGER.info("STT: Poll result - wrote: {}, confidence: {}", wrote, confStable[0]);
+      if (speaking) {
+        YellSpellsMod.LOGGER.info("STT: Poll result - wrote: {}, confidence: {}", wrote, confStable[0]);
+      }
       
       if (wrote > 0 && confStable[0] >= 0.65f) {
         textBuf.limit(wrote);

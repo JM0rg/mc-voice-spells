@@ -35,12 +35,7 @@ public final class VoiceActivityDetector {
     float hi = noise * 3.0f;
     float lo = noise * 1.5f;
 
-    // Debug logging every 100 frames (about every 2 seconds)
-    frameCount++;
-    if (frameCount % 100 == 0) {
-      YellSpellsMod.LOGGER.info("VAD: rms={}, noise={}, hi={}, lo={}, speaking={}, voicedCount={}", 
-        String.format("%.4f", rms), String.format("%.4f", noise), String.format("%.4f", hi), String.format("%.4f", lo), speaking, voicedCount);
-    }
+    // Reduce log spam: only log state transitions, not periodic telemetry
 
     if (speaking) {
       if (rms < lo) {
