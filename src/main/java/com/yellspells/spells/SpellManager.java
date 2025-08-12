@@ -64,8 +64,11 @@ public class SpellManager {
                 }
             }
             
-            // Execute spell command
-            executeSpellCommand(player, packet.spellId);
+            // Execute spell command (allow per-spell override)
+            String command = spellConfig.command != null && !spellConfig.command.isBlank()
+                ? spellConfig.command
+                : ("cast " + packet.spellId);
+            executeCommand(player, command);
             
             // Set cooldowns
             setCooldown(player.getUuid(), packet.spellId, spellConfig.cooldown);
@@ -137,11 +140,10 @@ public class SpellManager {
     /**
      * Execute a spell by running the corresponding /cast command
      */
-    private void executeSpellCommand(ServerPlayerEntity player, String spellId) {
+    private void executeCommand(ServerPlayerEntity player, String command) {
         try {
             MinecraftServer server = player.getServer();
             if (server != null) {
-                String command = "cast " + spellId;
                 YellSpellsMod.LOGGER.info("Executing command for player {}: /{}", player.getName().getString(), command);
                 
                 // Execute the command as the player
@@ -150,10 +152,10 @@ public class SpellManager {
                     command
                 );
             } else {
-                YellSpellsMod.LOGGER.error("Server is null, cannot execute spell command for player {}", player.getName().getString());
+                YellSpellsMod.LOGGER.error("Server is null, cannot execute command for player {}", player.getName().getString());
             }
         } catch (Exception e) {
-            YellSpellsMod.LOGGER.error("Failed to execute spell command for player {}: {}", player.getName().getString(), spellId, e);
+            YellSpellsMod.LOGGER.error("Failed to execute command for player {}: /{}", player.getName().getString(), command, e);
         }
     }
 }

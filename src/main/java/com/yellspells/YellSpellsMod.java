@@ -1,6 +1,8 @@
 package com.yellspells;
 
 import com.yellspells.config.YellSpellsConfig;
+import com.yellspells.commands.ReloadCommand;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import com.yellspells.network.YellSpellsNetworking;
 import com.yellspells.spells.SpellManager;
 import net.fabricmc.api.ModInitializer;
@@ -28,6 +30,8 @@ public final class YellSpellsMod implements ModInitializer {
     
     // Register networking
     YellSpellsNetworking.registerServer();
+    // Register commands
+    CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, env) -> ReloadCommand.register(dispatcher));
     
     LOGGER.info("YellSpells mod initialized");
   }

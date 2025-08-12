@@ -40,8 +40,8 @@ public class YellSpellsConfig {
     
     public YellSpellsConfig() {
         // Initialize default spells - spells are now handled by Magic System mod via /cast commands
-        spells.put("fireball", new SpellConfig("fireball", 2000, 0.6f, true));
-        spells.put("safedescent", new SpellConfig("safe descent", 40000, 0.6f, false));
+        spells.put("fireball", SpellConfig.ofSingle("fireball", 2000, 0.6f, true));
+        spells.put("safedescent", SpellConfig.ofSingle("safe descent", 40000, 0.6f, false));
     }
     
     public void load() {
@@ -71,20 +71,32 @@ public class YellSpellsConfig {
                     for (String key : spellsJson.keySet()) {
                         try {
                             JsonObject spellJson = spellsJson.getAsJsonObject(key);
-                            String keywordVal = spellJson.has("keyword") ? spellJson.get("keyword").getAsString() : key;
+                            // Back-compat: accept single keyword or keywords array
+                            java.util.List<String> keywords;
+                            if (spellJson.has("keywords") && spellJson.get("keywords").isJsonArray()) {
+                                keywords = new java.util.ArrayList<>();
+                                for (var el : spellJson.getAsJsonArray("keywords")) {
+                                    keywords.add(el.getAsString());
+                                }
+                            } else {
+                                String keywordVal = spellJson.has("keyword") ? spellJson.get("keyword").getAsString() : key;
+                                keywords = java.util.List.of(keywordVal);
+                            }
                             int cooldownVal = spellJson.has("cooldown") ? spellJson.get("cooldown").getAsInt() : 2000;
                             float confidenceVal = spellJson.has("confidenceThreshold") ? spellJson.get("confidenceThreshold").getAsFloat() : this.confidenceThreshold;
                             boolean requiresTargetVal = spellJson.has("requiresTarget") && spellJson.get("requiresTarget").getAsBoolean();
-                            SpellConfig spell = new SpellConfig(keywordVal, cooldownVal, confidenceVal, requiresTargetVal);
+                            boolean enabled = !spellJson.has("enabled") || spellJson.get("enabled").getAsBoolean();
+                            String command = spellJson.has("command") ? spellJson.get("command").getAsString() : null;
+                            SpellConfig spell = new SpellConfig(keywords, cooldownVal, confidenceVal, requiresTargetVal, enabled, command);
                             spells.put(key, spell);
                         } catch (Exception e) {
                             YellSpellsMod.LOGGER.warn("Failed to parse spell config for key {}. Using defaults.", key, e);
-                            spells.put(key, new SpellConfig(key, 2000, this.confidenceThreshold, false));
+                            spells.put(key, SpellConfig.ofSingle(key, 2000, this.confidenceThreshold, false));
                         }
                     }
                     // Ensure defaults exist if not present
-                    spells.putIfAbsent("fireball", new SpellConfig("fireball", 2000, 0.6f, true));
-                    spells.putIfAbsent("safedescent", new SpellConfig("safe descent", 40000, 0.6f, false));
+                    spells.putIfAbsent("fireball", SpellConfig.ofSingle("fireball", 2000, 0.6f, true));
+                    spells.putIfAbsent("safedescent", SpellConfig.ofSingle("safe descent", 40000, 0.6f, false));
                 }
                 
                 YellSpellsMod.LOGGER.info("Configuration loaded from {}", CONFIG_PATH);
@@ -120,10 +132,15 @@ public class YellSpellsConfig {
             for (Map.Entry<String, SpellConfig> entry : spells.entrySet()) {
                 JsonObject spellJson = new JsonObject();
                 SpellConfig spell = entry.getValue();
-                spellJson.addProperty("keyword", spell.keyword);
+                // prefer array form
+                var kwArr = new com.google.gson.JsonArray();
+                for (String k : spell.keywords) kwArr.add(k);
+                spellJson.add("keywords", kwArr);
                 spellJson.addProperty("cooldown", spell.cooldown);
                 spellJson.addProperty("confidenceThreshold", spell.confidenceThreshold);
                 spellJson.addProperty("requiresTarget", spell.requiresTarget);
+                spellJson.addProperty("enabled", spell.enabled);
+                if (spell.command != null) spellJson.addProperty("command", spell.command);
                 spellsJson.add(entry.getKey(), spellJson);
             }
             json.add("spells", spellsJson);
@@ -140,16 +157,23 @@ public class YellSpellsConfig {
     }
     
     public static class SpellConfig {
-        public String keyword;
+        public java.util.List<String> keywords;
         public int cooldown; // ms
         public float confidenceThreshold;
         public boolean requiresTarget;
+        public boolean enabled;
+        public String command; // optional override (e.g., "cast fireball power=2")
         
-        public SpellConfig(String keyword, int cooldown, float confidenceThreshold, boolean requiresTarget) {
-            this.keyword = keyword;
+        public SpellConfig(java.util.List<String> keywords, int cooldown, float confidenceThreshold, boolean requiresTarget, boolean enabled, String command) {
+            this.keywords = keywords;
             this.cooldown = cooldown;
             this.confidenceThreshold = confidenceThreshold;
             this.requiresTarget = requiresTarget;
+            this.enabled = enabled;
+            this.command = command;
+        }
+        public static SpellConfig ofSingle(String keyword, int cooldown, float confidenceThreshold, boolean requiresTarget) {
+            return new SpellConfig(java.util.List.of(keyword), cooldown, confidenceThreshold, requiresTarget, true, null);
         }
     }
 }

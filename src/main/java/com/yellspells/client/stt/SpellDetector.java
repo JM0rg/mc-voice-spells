@@ -25,8 +25,13 @@ public class SpellDetector {
             
             String spellId = entry.getKey();
             YellSpellsConfig.SpellConfig spellConfig = entry.getValue();
-            
-            if (lowerTranscript.contains(spellConfig.keyword.toLowerCase())) {
+            if (spellConfig == null || !spellConfig.enabled) continue;
+
+            boolean matched = false;
+            for (String kw : spellConfig.keywords) {
+                if (lowerTranscript.contains(kw.toLowerCase())) { matched = true; break; }
+            }
+            if (matched) {
                 // Check confidence threshold
                 if (confidence >= spellConfig.confidenceThreshold) {
                     // Update detection history
@@ -63,9 +68,11 @@ public class SpellDetector {
             
             String spellId = entry.getKey();
             YellSpellsConfig.SpellConfig spellConfig = entry.getValue();
-            
-            if (lowerTranscript.contains(spellConfig.keyword.toLowerCase())) {
-                return spellId;
+            if (spellConfig == null || !spellConfig.enabled) continue;
+            for (String kw : spellConfig.keywords) {
+                if (lowerTranscript.contains(kw.toLowerCase())) {
+                    return spellId;
+                }
             }
         }
         
