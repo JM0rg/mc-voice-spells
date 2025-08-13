@@ -42,6 +42,7 @@ public class YellSpellsConfig {
         // Initialize default spells - spells are now handled by Magic System mod via /cast commands
         spells.put("fireball", SpellConfig.ofSingle("fireball", 2000, 0.6f, true));
         spells.put("safedescent", SpellConfig.ofSingle("safe descent", 40000, 0.6f, false));
+        spells.put("greatwall", SpellConfig.ofSingle("great wall", 10000, 0.6f, true));
     }
     
     public void load() {
@@ -97,6 +98,7 @@ public class YellSpellsConfig {
                     // Ensure defaults exist if not present
                     spells.putIfAbsent("fireball", SpellConfig.ofSingle("fireball", 2000, 0.6f, true));
                     spells.putIfAbsent("safedescent", SpellConfig.ofSingle("safe descent", 40000, 0.6f, false));
+                    spells.putIfAbsent("greatwall", SpellConfig.ofSingle("great wall", 10000, 0.6f, true));
                 }
                 
                 YellSpellsMod.LOGGER.info("Configuration loaded from {}", CONFIG_PATH);
